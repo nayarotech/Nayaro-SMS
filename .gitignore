@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Environment files (copy the .env.example next to each one)
+.env
+.env.*
+!.env.example
+
+# Build output
+dist/
+dist-ssr/
+web-build/
+coverage/
+*.tsbuildinfo
+
+# Uploaded files and test uploads
+backend/storage/
+backend/storage-test/
+
+# Generated code
+backend/src/generated/
+mobile/.expo/
+mobile/expo-env.d.ts
+
+# Logs
+.dev-logs/
+*.log
+
+# Editors and OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json

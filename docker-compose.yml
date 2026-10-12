@@ -1,0 +1,27 @@
+# Local development services. Start with: docker compose up -d
+# Files (photos, documents) are stored on local disk for now — see backend/src/lib/storage.
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: sms_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: sms
+      MYSQL_USER: sms
+      MYSQL_PASSWORD: sms
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+  redis:
+    image: redis:7-alpine
+    container_name: sms_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+volumes:
+  mysql_data:

@@ -1,0 +1,1087 @@
+// School Management System — database schema (MySQL)
+//
+// Conventions
+// - Every tenant-owned table has `schoolId`. Queries must always filter by it
+//   (repositories take schoolId as their first argument).
+// - Dates are stored in AD (UTC). Bikram Sambat is a display concern handled by
+//   src/lib/nepali-date.ts on the backend and the web/mobile clients.
+// - IDs are UUIDs so they can't be guessed or enumerated across schools.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+// ─────────────────────────────────────────────────────────────
+// Platform & tenancy
+// ─────────────────────────────────────────────────────────────
+
+model School {
+  id        String   @id @default(uuid())
+  name      String
+  /// Short unique code, e.g. "SXS" — used in admission numbers and support.
+  code      String   @unique
+  address   String?
+  phone     String?
+  email     String?
+  logoKey   String?
+  /// Per-school setting overrides. Keys and defaults live in src/modules/settings/settings.registry.ts
+  settings  Json
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users              User[]
+  roles              Role[]
+  academicYears      AcademicYear[]
+  classes            SchoolClass[]
+  sections           Section[]
+  subjects           Subject[]
+  periods            Period[]
+  students           Student[]
+  guardians          Guardian[]
+  auditLogs          AuditLog[]
+  files              StoredFile[]
+  classSubjects      ClassSubject[]
+  subjectAssignments SubjectAssignment[]
+  classTeachers      ClassTeacherAssignment[]
+  timetableEntries   TimetableEntry[]
+  enrollments        Enrollment[]
+  staffProfiles      StaffProfile[]
+  studentDocuments   StudentDocument[]
+  website            Website?
+  websitePages       WebsitePage[]
+  websitePosts       WebsitePost[]
+  galleryAlbums      GalleryAlbum[]
+  enquiries          WebsiteEnquiry[]
+  attendanceDays     AttendanceDay[]
+  proxyAssignments   ProxyAssignment[]
+  notifications      Notification[]
+  exams              Exam[]
+  gradingScale       GradingScale?
+  promotionRuns      PromotionRun[]
+  studentNotes       StudentNote[]
+}
+
+// ─────────────────────────────────────────────────────────────
+// Users, roles & permissions
+// ─────────────────────────────────────────────────────────────
+
+/// A login account. Users belong to one school; the same phone can have accounts
+/// in several schools (login then asks which school). Super admins have no school.
+model User {
+  id                String    @id @default(uuid())
+  schoolId          String?
+  fullName          String
+  email             String?
+  phone             String?
+  /// Null for accounts that only log in with phone + OTP (most parents).
+  passwordHash      String?
+  isSuperAdmin      Boolean   @default(false)
+  isActive          Boolean   @default(true)
+  preferredLanguage String    @default("en")
+  photoKey          String?
+  lastLoginAt       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  school              School?                  @relation(fields: [schoolId], references: [id])
+  roles               UserRole[]
+  permissionOverrides UserPermissionOverride[]
+  refreshTokens       RefreshToken[]
+  staffProfile        StaffProfile?
+  guardian            Guardian?
+  student             Student?
+  subjectAssignments  SubjectAssignment[]
+  classTeacherOf      ClassTeacherAssignment[]
+  timetableEntries    TimetableEntry[]
+  proxyAssignments    ProxyAssignment[]        @relation("ProxyTeacher")
+  notifications       Notification[]
+  studentNotes        StudentNote[]
+
+  @@unique([schoolId, email])
+  @@unique([schoolId, phone])
+  @@index([phone])
+  @@index([email])
+}
+
+/// A role within one school. Built-in roles are created for every school
+/// (isSystem = true) and can have their permissions edited but not be deleted.
+model Role {
+  id          String   @id @default(uuid())
+  schoolId    String
+  /// Stable machine key, e.g. "class_teacher". Custom roles get a slug of their name.
+  key         String
+  name        String
+  description String?
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  school      School           @relation(fields: [schoolId], references: [id])
+  permissions RolePermission[]
+  users       UserRole[]
+
+  @@unique([schoolId, key])
+}
+
+/// Permission keys are defined in code (src/modules/permissions/permission.catalog.ts).
+/// "*" means every permission (used by the School Admin role).
+model RolePermission {
+  roleId     String
+  permission String
+
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permission])
+}
+
+model UserRole {
+  userId    String
+  roleId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@index([roleId])
+}
+
+enum PermissionEffect {
+  GRANT
+  DENY
+}
+
+/// Per-user exceptions on top of their roles: GRANT adds a permission, DENY removes it.
+model UserPermissionOverride {
+  userId     String
+  permission String
+  effect     PermissionEffect
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, permission])
+}
+
+/// Refresh tokens are stored hashed and rotated on every use. If a rotated
+/// (already used) token is presented again, the whole family is revoked.
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
+  familyId  String
+  expiresAt DateTime
+  revokedAt DateTime?
+  usedAt    DateTime?
+  userAgent String?   @db.VarChar(500)
+  ip        String?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
+}
+
+/// Who changed what, with old and new values. Written by src/modules/audit/audit.service.ts
+model AuditLog {
+  id         String   @id @default(uuid())
+  schoolId   String?
+  actorId    String?
+  /// e.g. "role.update", "user.create", "student.admit"
+  action     String
+  entityType String
+  entityId   String?
+  oldValue   Json?
+  newValue   Json?
+  ip         String?
+  createdAt  DateTime @default(now())
+
+  school School? @relation(fields: [schoolId], references: [id])
+
+  @@index([schoolId, createdAt])
+  @@index([schoolId, entityType, entityId])
+}
+
+/// Uploaded file metadata. The bytes live in the storage driver (local disk for now).
+model StoredFile {
+  id           String   @id @default(uuid())
+  schoolId     String
+  /// Path inside the storage driver, always prefixed with the school id.
+  key          String   @unique
+  originalName String
+  mimeType     String
+  sizeBytes    Int
+  /// Public files (website images) are served without a signed link.
+  isPublic     Boolean  @default(false)
+  uploadedById String?
+  createdAt    DateTime @default(now())
+
+  school School @relation(fields: [schoolId], references: [id])
+
+  @@index([schoolId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Staff
+// ─────────────────────────────────────────────────────────────
+
+model StaffProfile {
+  id            String    @id @default(uuid())
+  schoolId      String
+  userId        String    @unique
+  employeeId    String?
+  designation   String?
+  gender        Gender?
+  dateOfBirth   DateTime? @db.Date
+  joinDate      DateTime? @db.Date
+  qualification String?
+  address       String?
+
+  school School @relation(fields: [schoolId], references: [id])
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, employeeId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Academic setup
+// ─────────────────────────────────────────────────────────────
+
+model AcademicYear {
+  id        String   @id @default(uuid())
+  schoolId  String
+  /// Usually the BS year, e.g. "2082"
+  name      String
+  startDate DateTime @db.Date
+  endDate   DateTime @db.Date
+  isCurrent Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  school             School                   @relation(fields: [schoolId], references: [id])
+  subjectAssignments SubjectAssignment[]
+  classTeachers      ClassTeacherAssignment[]
+  timetableEntries   TimetableEntry[]
+  enrollments        Enrollment[]
+  attendanceDays     AttendanceDay[]
+  exams              Exam[]
+  subjectChoices     StudentSubject[]
+  promotionRunsFrom  PromotionRun[]           @relation("PromotionFromYear")
+  promotionRunsTo    PromotionRun[]           @relation("PromotionToYear")
+
+  @@unique([schoolId, name])
+}
+
+/// A class/grade, e.g. "Nursery", "Grade 1". Persists across academic years.
+model SchoolClass {
+  id        String   @id @default(uuid())
+  schoolId  String
+  name      String
+  /// Sort order and promotion order (next class = next higher order).
+  order     Int
+  createdAt DateTime @default(now())
+
+  school        School         @relation(fields: [schoolId], references: [id])
+  sections      Section[]
+  subjects      ClassSubject[]
+  enrollments   Enrollment[]
+  examSubjects  ExamSubject[]
+  promotionRuns PromotionRun[]
+
+  @@unique([schoolId, name])
+}
+
+model Section {
+  id        String   @id @default(uuid())
+  schoolId  String
+  classId   String
+  name      String
+  capacity  Int?
+  room      String?
+  createdAt DateTime @default(now())
+
+  school             School                   @relation(fields: [schoolId], references: [id])
+  class              SchoolClass              @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subjectAssignments SubjectAssignment[]
+  classTeachers      ClassTeacherAssignment[]
+  timetableEntries   TimetableEntry[]
+  enrollments        Enrollment[]
+  attendanceDays     AttendanceDay[]
+  proxyAssignments   ProxyAssignment[]
+  markSheets         MarkSheet[]
+
+  @@unique([classId, name])
+}
+
+model Subject {
+  id           String   @id @default(uuid())
+  schoolId     String
+  name         String
+  code         String?
+  hasPractical Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  school             School              @relation(fields: [schoolId], references: [id])
+  classes            ClassSubject[]
+  subjectAssignments SubjectAssignment[]
+  timetableEntries   TimetableEntry[]
+  examSubjects       ExamSubject[]
+  markSheets         MarkSheet[]
+  studentChoices     StudentSubject[]
+
+  @@unique([schoolId, name])
+}
+
+/// Which subjects a class studies (its curriculum).
+/// Optional subjects are grouped (e.g. "Optional I": Computer or Account); each
+/// student chooses one subject per group for the year (StudentSubject).
+model ClassSubject {
+  schoolId    String
+  classId     String
+  subjectId   String
+  isOptional  Boolean @default(false)
+  /// For optional subjects, e.g. "Optional I". Null = the class\'s single default group.
+  optionGroup String?
+
+  school  School      @relation(fields: [schoolId], references: [id])
+  class   SchoolClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subject Subject     @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@id([classId, subjectId])
+}
+
+/// Teacher X teaches subject Y to section Z in academic year N.
+model SubjectAssignment {
+  id             String @id @default(uuid())
+  schoolId       String
+  academicYearId String
+  sectionId      String
+  subjectId      String
+  teacherId      String
+
+  school       School       @relation(fields: [schoolId], references: [id])
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  section      Section      @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  subject      Subject      @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  teacher      User         @relation(fields: [teacherId], references: [id])
+
+  @@unique([academicYearId, sectionId, subjectId, teacherId])
+  @@index([teacherId])
+}
+
+/// One class teacher per section per academic year.
+model ClassTeacherAssignment {
+  id             String @id @default(uuid())
+  schoolId       String
+  academicYearId String
+  sectionId      String
+  teacherId      String
+
+  school       School       @relation(fields: [schoolId], references: [id])
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  section      Section      @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  teacher      User         @relation(fields: [teacherId], references: [id])
+
+  @@unique([academicYearId, sectionId])
+  @@index([teacherId])
+}
+
+/// A slot in the school day (bell schedule), e.g. "Period 1, 10:00–10:45".
+model Period {
+  id        String  @id @default(uuid())
+  schoolId  String
+  name      String
+  /// "HH:mm", 24h, school-local time
+  startTime String
+  endTime   String
+  order     Int
+  isBreak   Boolean @default(false)
+
+  school           School           @relation(fields: [schoolId], references: [id])
+  timetableEntries TimetableEntry[]
+
+  @@unique([schoolId, name])
+}
+
+model TimetableEntry {
+  id             String  @id @default(uuid())
+  schoolId       String
+  academicYearId String
+  sectionId      String
+  /// 0 = Sunday … 6 = Saturday
+  dayOfWeek      Int
+  periodId       String
+  subjectId      String?
+  teacherId      String?
+
+  school       School       @relation(fields: [schoolId], references: [id])
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  section      Section      @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  period       Period       @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  subject      Subject?     @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  teacher      User?        @relation(fields: [teacherId], references: [id], onDelete: SetNull)
+
+  @@unique([academicYearId, sectionId, dayOfWeek, periodId])
+  @@index([teacherId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Students & guardians
+// ─────────────────────────────────────────────────────────────
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum StudentStatus {
+  ACTIVE
+  LEFT
+  TRANSFERRED
+  GRADUATED
+}
+
+model Student {
+  id               String        @id @default(uuid())
+  schoolId         String
+  admissionNo      String
+  firstName        String
+  middleName       String?
+  lastName         String
+  gender           Gender
+  dateOfBirth      DateTime      @db.Date
+  bloodGroup       String?
+  religion         String?
+  nationality      String?       @default("Nepali")
+  address          String?
+  temporaryAddress String?
+  phone            String?
+  email            String?
+  photoKey         String?
+  admissionDate    DateTime      @db.Date
+  previousSchool   String?
+  medicalNotes     String?       @db.Text
+  status           StudentStatus @default(ACTIVE)
+  /// Optional login account for the student (mobile app).
+  userId           String?       @unique
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  school             School              @relation(fields: [schoolId], references: [id])
+  user               User?               @relation(fields: [userId], references: [id])
+  guardians          StudentGuardian[]
+  enrollments        Enrollment[]
+  documents          StudentDocument[]
+  attendance         AttendanceRecord[]
+  marks              Mark[]
+  remarks            ReportCardRemark[]
+  notes              StudentNote[]
+  promotionDecisions PromotionDecision[]
+  subjectChoices     StudentSubject[]
+
+  @@unique([schoolId, admissionNo])
+  @@index([schoolId, lastName, firstName])
+}
+
+/// Guardian details. Every guardian has a User account (the "Parent" role) so
+/// they can log in with phone + OTP. One guardian can be linked to several children.
+model Guardian {
+  id               String    @id @default(uuid())
+  schoolId         String
+  userId           String    @unique
+  occupation       String?
+  address          String?
+  alternatePhone   String?
+  whatsappOptIn    Boolean   @default(false)
+  whatsappOptInAt  DateTime?
+  whatsappOptOutAt DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  school   School            @relation(fields: [schoolId], references: [id])
+  user     User              @relation(fields: [userId], references: [id])
+  students StudentGuardian[]
+}
+
+enum GuardianRelation {
+  FATHER
+  MOTHER
+  GUARDIAN
+  GRANDPARENT
+  SIBLING
+  OTHER
+}
+
+model StudentGuardian {
+  studentId  String
+  guardianId String
+  relation   GuardianRelation
+  isPrimary  Boolean          @default(false)
+
+  student  Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  guardian Guardian @relation(fields: [guardianId], references: [id], onDelete: Cascade)
+
+  @@id([studentId, guardianId])
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  PROMOTED
+  DETAINED
+  TRANSFERRED
+  LEFT
+  GRADUATED
+  /// Finished the year (results stay in the ledger) but didn't continue at this school
+  COMPLETED
+}
+
+/// Student × academic year × class × section. Never overwritten — promotion
+/// closes the current row and creates a new one, so the full history is kept.
+/// LEFT/TRANSFERRED mean the student left during the year and are dropped from
+/// registers and ledgers; every other status still counts for that year.
+model Enrollment {
+  id             String           @id @default(uuid())
+  schoolId       String
+  studentId      String
+  academicYearId String
+  classId        String
+  sectionId      String
+  rollNo         Int?
+  status         EnrollmentStatus @default(ACTIVE)
+  remarks        String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  school             School              @relation(fields: [schoolId], references: [id])
+  student            Student             @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  academicYear       AcademicYear        @relation(fields: [academicYearId], references: [id])
+  class              SchoolClass         @relation(fields: [classId], references: [id])
+  section            Section             @relation(fields: [sectionId], references: [id])
+  promotionDecisions PromotionDecision[] @relation("DecisionFrom")
+
+  @@unique([studentId, academicYearId])
+  @@index([schoolId, academicYearId, sectionId])
+}
+
+model StudentDocument {
+  id           String   @id @default(uuid())
+  schoolId     String
+  studentId    String
+  /// e.g. "Birth certificate"
+  title        String
+  fileKey      String
+  uploadedById String?
+  createdAt    DateTime @default(now())
+
+  school  School  @relation(fields: [schoolId], references: [id])
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Public school website (builder)
+// Pages are lists of blocks stored as JSON. Block types and their settings
+// are defined in src/modules/website/renderer/blocks — see README there.
+// ─────────────────────────────────────────────────────────────
+
+model Website {
+  id           String    @id @default(uuid())
+  schoolId     String    @unique
+  isPublished  Boolean   @default(false)
+  /// e.g. "www.shreedemo.edu.np" — points at this platform via DNS
+  customDomain String?   @unique
+  /// { preset, colors, fonts, radius } — see renderer/theme.ts
+  theme        Json
+  /// { topBar, menu, cta } — see renderer/layout.ts
+  header       Json
+  /// { about, columns, social } — see renderer/layout.ts
+  footer       Json
+  /// { title, description, imageKey }
+  seo          Json
+  publishedAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  school School        @relation(fields: [schoolId], references: [id])
+  pages  WebsitePage[]
+}
+
+enum WebsitePageStatus {
+  DRAFT
+  PUBLISHED
+}
+
+model WebsitePage {
+  id              String            @id @default(uuid())
+  schoolId        String
+  websiteId       String
+  title           String
+  /// "" for the home page, otherwise e.g. "about-us"
+  slug            String
+  isHome          Boolean           @default(false)
+  status          WebsitePageStatus @default(DRAFT)
+  /// What the editor saves (autosave)
+  draftBlocks     Json
+  /// What visitors see; set when the page is published
+  publishedBlocks Json?
+  seoTitle        String?
+  seoDescription  String?           @db.Text
+  showInMenu      Boolean           @default(true)
+  menuOrder       Int               @default(0)
+  publishedAt     DateTime?
+  updatedById     String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  school    School                @relation(fields: [schoolId], references: [id])
+  website   Website               @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  revisions WebsitePageRevision[]
+
+  @@unique([websiteId, slug])
+}
+
+/// A snapshot of a page each time it's published, so a previous version can be restored.
+model WebsitePageRevision {
+  id          String   @id @default(uuid())
+  pageId      String
+  title       String
+  blocks      Json
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  page WebsitePage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@index([pageId, createdAt])
+}
+
+enum WebsitePostType {
+  NOTICE
+  NEWS
+  EVENT
+}
+
+enum WebsitePostStatus {
+  DRAFT
+  PUBLISHED
+}
+
+/// Notices, news and events shown on the public website.
+model WebsitePost {
+  id            String            @id @default(uuid())
+  schoolId      String
+  type          WebsitePostType
+  title         String
+  slug          String
+  excerpt       String?           @db.Text
+  /// Sanitised HTML from the rich-text editor
+  content       String            @db.MediumText
+  coverImageKey String?
+  /// [{ title, fileKey }] — e.g. a PDF of the notice
+  attachments   Json
+  isPinned      Boolean           @default(false)
+  eventStart    DateTime?
+  eventEnd      DateTime?
+  location      String?
+  status        WebsitePostStatus @default(DRAFT)
+  publishedAt   DateTime?
+  authorId      String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  school School @relation(fields: [schoolId], references: [id])
+
+  @@unique([schoolId, type, slug])
+  @@index([schoolId, type, status, publishedAt])
+}
+
+model GalleryAlbum {
+  id          String    @id @default(uuid())
+  schoolId    String
+  title       String
+  slug        String
+  description String?   @db.Text
+  /// [{ key, caption }] in display order
+  photos      Json
+  isPublished Boolean   @default(true)
+  eventDate   DateTime? @db.Date
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  school School @relation(fields: [schoolId], references: [id])
+
+  @@unique([schoolId, slug])
+}
+
+enum EnquiryStatus {
+  NEW
+  CONTACTED
+  CLOSED
+}
+
+/// Messages and admission enquiries sent from the public website's forms.
+model WebsiteEnquiry {
+  id        String        @id @default(uuid())
+  schoolId  String
+  /// "contact" or "admission"
+  kind      String
+  name      String
+  phone     String?
+  email     String?
+  /// e.g. the class a parent is asking about
+  subject   String?
+  message   String        @db.Text
+  status    EnquiryStatus @default(NEW)
+  notes     String?       @db.Text
+  ip        String?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  school School @relation(fields: [schoolId], references: [id])
+
+  @@index([schoolId, status, createdAt])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Attendance
+// One AttendanceDay per section per date (who took it, as class teacher or proxy),
+// with one AttendanceRecord per student.
+// ─────────────────────────────────────────────────────────────
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  LEAVE
+}
+
+model AttendanceDay {
+  id             String   @id @default(uuid())
+  schoolId       String
+  academicYearId String
+  sectionId      String
+  date           DateTime @db.Date
+  takenById      String
+  takenAsProxy   Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  school       School             @relation(fields: [schoolId], references: [id])
+  academicYear AcademicYear       @relation(fields: [academicYearId], references: [id])
+  section      Section            @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  records      AttendanceRecord[]
+
+  @@unique([sectionId, date])
+  @@index([schoolId, date])
+}
+
+model AttendanceRecord {
+  id          String           @id @default(uuid())
+  schoolId    String
+  dayId       String
+  studentId   String
+  status      AttendanceStatus
+  remark      String?
+  updatedById String?
+  updatedAt   DateTime         @updatedAt
+
+  day     AttendanceDay @relation(fields: [dayId], references: [id], onDelete: Cascade)
+  student Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([dayId, studentId])
+  @@index([studentId])
+}
+
+/// A teacher allowed to take one section's attendance on the given dates
+/// (e.g. while the class teacher is on leave). Expires automatically after endDate.
+model ProxyAssignment {
+  id           String    @id @default(uuid())
+  schoolId     String
+  sectionId    String
+  teacherId    String
+  startDate    DateTime  @db.Date
+  endDate      DateTime  @db.Date
+  reason       String?
+  assignedById String
+  revokedAt    DateTime?
+  createdAt    DateTime  @default(now())
+
+  school  School  @relation(fields: [schoolId], references: [id])
+  section Section @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  teacher User    @relation("ProxyTeacher", fields: [teacherId], references: [id])
+
+  @@index([teacherId, startDate, endDate])
+  @@index([sectionId, startDate])
+}
+
+/// In-app notifications (e.g. "Aarav was marked absent today"). Push and WhatsApp
+/// delivery can be added on top of this table.
+model Notification {
+  id        String    @id @default(uuid())
+  schoolId  String
+  userId    String
+  /// e.g. "attendance.absent", "results.published"
+  type      String
+  title     String
+  body      String    @db.Text
+  data      Json?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  school School @relation(fields: [schoolId], references: [id])
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Exams & marks
+// Exam → ExamSubject (full/pass marks per class & subject)
+// MarkSheet = one subject for one section in one exam, with its workflow status
+// Mark = one student's marks on a mark sheet
+// ─────────────────────────────────────────────────────────────
+
+/// The school's grading scale (percentage bands → grade and grade point).
+model GradingScale {
+  id        String   @id @default(uuid())
+  schoolId  String   @unique
+  /// [{ min, grade, gradePoint, remark }] sorted from highest min
+  bands     Json
+  updatedAt DateTime @updatedAt
+
+  school School @relation(fields: [schoolId], references: [id])
+}
+
+model Exam {
+  id             String    @id @default(uuid())
+  schoolId       String
+  academicYearId String
+  /// e.g. "First Terminal Examination"
+  name           String
+  order          Int       @default(1)
+  startDate      DateTime? @db.Date
+  endDate        DateTime? @db.Date
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  school       School             @relation(fields: [schoolId], references: [id])
+  academicYear AcademicYear       @relation(fields: [academicYearId], references: [id])
+  subjects     ExamSubject[]
+  markSheets   MarkSheet[]
+  remarks      ReportCardRemark[]
+
+  @@unique([academicYearId, name])
+}
+
+model ExamSubject {
+  id                 String    @id @default(uuid())
+  schoolId           String
+  examId             String
+  classId            String
+  subjectId          String
+  theoryFullMarks    Float
+  theoryPassMarks    Float
+  practicalFullMarks Float     @default(0)
+  practicalPassMarks Float     @default(0)
+  creditHours        Float     @default(4)
+  /// Shown in the exam routine
+  examDate           DateTime? @db.Date
+
+  exam    Exam        @relation(fields: [examId], references: [id], onDelete: Cascade)
+  class   SchoolClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subject Subject     @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@unique([examId, classId, subjectId])
+}
+
+enum MarkSheetStatus {
+  DRAFT
+  SUBMITTED
+  VERIFIED
+  PUBLISHED
+}
+
+model MarkSheet {
+  id            String          @id @default(uuid())
+  schoolId      String
+  examId        String
+  sectionId     String
+  subjectId     String
+  status        MarkSheetStatus @default(DRAFT)
+  submittedById String?
+  submittedAt   DateTime?
+  verifiedById  String?
+  verifiedAt    DateTime?
+  publishedById String?
+  publishedAt   DateTime?
+  /// Why it was sent back to the teacher
+  returnNote    String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  exam    Exam    @relation(fields: [examId], references: [id], onDelete: Cascade)
+  section Section @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  subject Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  marks   Mark[]
+
+  @@unique([examId, sectionId, subjectId])
+  @@index([schoolId, examId])
+}
+
+enum MarkStatus {
+  PRESENT
+  ABSENT
+  MEDICAL
+}
+
+model Mark {
+  id          String     @id @default(uuid())
+  schoolId    String
+  markSheetId String
+  studentId   String
+  theory      Float?
+  practical   Float?
+  status      MarkStatus @default(PRESENT)
+  updatedById String?
+  updatedAt   DateTime   @updatedAt
+
+  markSheet MarkSheet @relation(fields: [markSheetId], references: [id], onDelete: Cascade)
+  student   Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([markSheetId, studentId])
+  @@index([studentId])
+}
+
+/// Class teacher's comment printed on a student's report card.
+model ReportCardRemark {
+  id        String   @id @default(uuid())
+  schoolId  String
+  examId    String
+  studentId String
+  remark    String   @db.Text
+  authorId  String
+  updatedAt DateTime @updatedAt
+
+  exam    Exam    @relation(fields: [examId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([examId, studentId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Promotion & detention
+// A PromotionRun is one "promote this class" action. Each student in it gets a
+// PromotionDecision; the year's Enrollment is closed (PROMOTED, DETAINED…) and a
+// new Enrollment is created in the next year. A run can be undone while the new
+// year has no attendance or marks for those students.
+// ─────────────────────────────────────────────────────────────
+
+enum PromotionOutcome {
+  PROMOTE
+  DETAIN
+  GRADUATE
+  /// Finished the year and left the school (transfer certificate, moved away…)
+  LEAVE
+}
+
+model PromotionRun {
+  id          String    @id @default(uuid())
+  schoolId    String
+  fromYearId  String
+  toYearId    String
+  classId     String
+  /// Exam whose results the suggestions were based on (null = none used)
+  examId      String?
+  /// "rank" | "name" | "keep"
+  rollNumbers String
+  createdById String
+  createdAt   DateTime  @default(now())
+  undoneAt    DateTime?
+  undoneById  String?
+
+  school    School              @relation(fields: [schoolId], references: [id])
+  fromYear  AcademicYear        @relation("PromotionFromYear", fields: [fromYearId], references: [id])
+  toYear    AcademicYear        @relation("PromotionToYear", fields: [toYearId], references: [id])
+  class     SchoolClass         @relation(fields: [classId], references: [id], onDelete: Cascade)
+  decisions PromotionDecision[]
+
+  @@index([schoolId, fromYearId])
+}
+
+model PromotionDecision {
+  id                    String            @id @default(uuid())
+  runId                 String
+  studentId             String
+  outcome               PromotionOutcome
+  fromEnrollmentId      String
+  /// The new year's enrollment (PROMOTE / DETAIN)
+  toEnrollmentId        String?           @unique
+  /// What the system suggested, for the record
+  suggested             PromotionOutcome?
+  reason                String?           @db.VarChar(500)
+  /// Restored on undo
+  previousStudentStatus StudentStatus
+
+  run            PromotionRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  student        Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  fromEnrollment Enrollment   @relation("DecisionFrom", fields: [fromEnrollmentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Student notes — part of the 360° profile
+// ─────────────────────────────────────────────────────────────
+
+enum StudentNoteCategory {
+  ACHIEVEMENT
+  DISCIPLINE
+  COUNSELLING
+  HEALTH
+  GENERAL
+}
+
+model StudentNote {
+  id                String              @id @default(uuid())
+  schoolId          String
+  studentId         String
+  category          StudentNoteCategory
+  title             String
+  body              String?             @db.Text
+  date              DateTime            @db.Date
+  /// Shared notes are shown to the student's parents in the app
+  sharedWithParents Boolean             @default(false)
+  authorId          String
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  school  School  @relation(fields: [schoolId], references: [id])
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  author  User    @relation(fields: [authorId], references: [id])
+
+  @@index([studentId, date])
+}
+
+/// An optional subject a student chose for one academic year (one per option group).
+/// Mark sheets of optional subjects list only the students who chose them.
+model StudentSubject {
+  id             String   @id @default(uuid())
+  schoolId       String
+  studentId      String
+  academicYearId String
+  subjectId      String
+  createdAt      DateTime @default(now())
+
+  student      Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  subject      Subject      @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, academicYearId, subjectId])
+  @@index([academicYearId, subjectId])
+}

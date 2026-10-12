@@ -1,0 +1,20 @@
+@import "tailwindcss";
+
+/*
+ * --brand is set at runtime from the school's settings (branding.primaryColor),
+ * see src/lib/branding.ts. Use bg-brand / text-brand / bg-brand-soft in components.
+ */
+:root {
+  --brand: #2563eb;
+}
+
+@theme inline {
+  --color-brand: var(--brand);
+  --color-brand-strong: color-mix(in srgb, var(--brand) 85%, black);
+  --color-brand-soft: color-mix(in srgb, var(--brand) 10%, white);
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif, "Noto Sans Devanagari";
+}
+
+body {
+  @apply bg-slate-50 text-slate-900 antialiased;
+}
