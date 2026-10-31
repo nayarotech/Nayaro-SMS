@@ -5,6 +5,7 @@ import { fileUrl, storage } from "../../lib/storage/index.js";
 import { paginate, type Paginated } from "../../http/schemas.js";
 import type { AuthContext } from "../../http/auth-context.js";
 import { recordAudit, type Actor } from "../audit/audit.service.js";
+import { assertStudentCapacity } from "../schools/plan.service.js";
 import { recordAccess } from "./student-record.service.js";
 import { resolveAcademicYear } from "../academic/academic-year.service.js";
 import { findSection } from "../academic/class.service.js";
@@ -68,6 +69,7 @@ export async function admitStudent(actor: Actor, input: AdmissionInput) {
   await assertFilesBelongToSchool(actor.schoolId, [input.photoKey, ...(input.documents ?? []).map((d) => d.fileKey)]);
 
   const studentId = await prisma.$transaction(async (tx) => {
+    await assertStudentCapacity(actor.schoolId, 1, tx);
     const admissionNo = input.admissionNo || (await nextAdmissionNo(tx, actor.schoolId, String(settings["students.admissionNoPrefix"] ?? ""), year.name));
     if (await tx.student.findUnique({ where: { schoolId_admissionNo: { schoolId: actor.schoolId, admissionNo } } })) {
       throw conflict(`Admission number ${admissionNo} is already used`, { fieldErrors: { admissionNo: ["Already used"] } });
@@ -300,6 +302,8 @@ export async function updateStudent(actor: Actor, studentId: string, input: Part
   await assertFilesBelongToSchool(actor.schoolId, [input.photoKey]);
 
   await prisma.$transaction(async (tx) => {
+    // Bringing back a student who left counts against the plan again
+    if (input.status === "ACTIVE" && before.status !== "ACTIVE") await assertStudentCapacity(actor.schoolId, 1, tx);
     await tx.student.update({ where: { id: studentId }, data: { ...studentData(input), status: input.status } });
     await recordAudit(
       actor,

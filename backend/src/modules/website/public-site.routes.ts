@@ -11,8 +11,8 @@ import { html } from "./renderer/html.js";
 
 /**
  * Serves school websites to visitors (HTML, not JSON):
- *   http://api-host/sites/DEMO/...       always
- *   http://demo.<SITES_BASE_DOMAIN>/...  when SITES_BASE_DOMAIN is set
+ *   http://api-host/sites/SXS/...        always
+ *   http://sxs.<SITES_BASE_DOMAIN>/...   when SITES_BASE_DOMAIN is set
  *   http://www.school-domain.edu.np/...  a school's custom domain (Website → Settings)
  */
 export function publicSiteRouter(): Router {

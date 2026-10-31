@@ -36,6 +36,9 @@ const envSchema = z.object({
   /** Chrome/Chromium used to make PDFs (report cards, receipts). Found automatically if empty. */
   PDF_CHROME_PATH: z.string().optional(),
 
+  /** Shown to schools that reach their student limit, e.g. "Nayaro Tech · 98XXXXXXXX · sales@example.com" */
+  SALES_CONTACT: z.string().default(""),
+
   SMS_PROVIDER: z.enum(["console", "sparrow"]).default("console"),
   SPARROW_SMS_TOKEN: z.string().optional(),
   SPARROW_SMS_FROM: z.string().optional(),

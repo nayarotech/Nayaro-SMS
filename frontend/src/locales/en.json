@@ -31,7 +31,10 @@
     "examSetup": "Exam setup",
     "results": "Results & report cards",
     "promotion": "Promotion",
-    "optionalSubjects": "Optional subjects"
+    "optionalSubjects": "Optional subjects",
+    "learning": "Learning",
+    "homework": "Homework",
+    "materials": "Study materials"
   },
   "common": {
     "save": "Save",

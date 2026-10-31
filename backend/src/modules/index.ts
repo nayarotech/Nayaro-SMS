@@ -11,6 +11,7 @@ import { attendanceModule } from "./attendance/attendance.routes.js";
 import { auditModule } from "./audit/audit.routes.js";
 import { examsModule } from "./exams/exam.routes.js";
 import { promotionsModule } from "./promotions/promotion.routes.js";
+import { homeworkModule, materialsModule } from "./learning/learning.routes.js";
 import { notificationsModule } from "./notifications/notification.routes.js";
 import { authModule } from "./auth/auth.routes.js";
 import { dashboardModule } from "./dashboard/dashboard.routes.js";
@@ -44,6 +45,8 @@ export const modules: RouteModule[] = [
   attendanceModule,
   examsModule,
   promotionsModule,
+  homeworkModule,
+  materialsModule,
   websiteModule,
   notificationsModule,
   auditModule,

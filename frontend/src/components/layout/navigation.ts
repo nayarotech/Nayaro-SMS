@@ -1,5 +1,7 @@
 import {
   BookOpen,
+  BookOpenCheck,
+  Library,
   BarChart3,
   FileCog,
   PenLine,
@@ -68,6 +70,13 @@ export const NAVIGATION: NavSection[] = [
       { labelKey: "nav.results", path: "/exams/results", icon: Trophy, permission: ["exam.manage", "marks.verify", "marks.publish", "reportcard.generate", "attendance.mark"], module: "exams" },
       { labelKey: "nav.examSetup", path: "/exams", icon: FileCog, permission: "exam.manage", module: "exams" },
       { labelKey: "nav.promotion", path: "/promotions", icon: TrendingUp, permission: "promotion.manage" },
+    ],
+  },
+  {
+    labelKey: "nav.learning",
+    items: [
+      { labelKey: "nav.homework", path: "/homework", icon: BookOpenCheck, permission: ["homework.post", "homework.post_on_behalf", "student.record.view"], module: "homework" },
+      { labelKey: "nav.materials", path: "/materials", icon: Library, permission: ["material.upload", "homework.post", "homework.post_on_behalf", "student.record.view"], module: "homework" },
     ],
   },
   {

@@ -4,6 +4,8 @@ import { dateString, idParam, optionalText, pagination, phoneNumber } from "../.
 import * as guardianService from "../guardians/guardian.service.js";
 import { studentAttendance } from "../attendance/attendance-reports.service.js";
 import { publishedResultDetail, publishedResultsForStudent, reportCardsPdf } from "../exams/results.service.js";
+import { childHomework } from "../learning/homework.service.js";
+import { childMaterials } from "../learning/material.service.js";
 import * as recordService from "./student-record.service.js";
 import * as studentService from "./student.service.js";
 
@@ -337,6 +339,27 @@ export const myModule = defineModule("/my", "Parent app", [
     handler: async ({ auth, schoolId, params }) => {
       await ownChild(auth, params.id);
       return recordService.sharedNotes(schoolId, params.id);
+    },
+  }),
+  route({
+    method: "get",
+    path: "/children/:id/homework",
+    summary: "A child's homework: upcoming (due today or later) or past, with whether they did it",
+    params: idParam,
+    query: z.object({ when: z.enum(["upcoming", "past"]).default("upcoming") }),
+    handler: async ({ auth, schoolId, params, query }) => {
+      await ownChild(auth, params.id);
+      return childHomework(schoolId, params.id, query.when);
+    },
+  }),
+  route({
+    method: "get",
+    path: "/children/:id/materials",
+    summary: "Course materials for a child's class, by subject",
+    params: idParam,
+    handler: async ({ auth, schoolId, params }) => {
+      await ownChild(auth, params.id);
+      return childMaterials(schoolId, params.id);
     },
   }),
   route({

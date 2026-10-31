@@ -40,6 +40,7 @@ export function StudentDetailPage() {
     queryClient.setQueryData(["student", id], updated);
     void queryClient.invalidateQueries({ queryKey: ["students"] });
     void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    void queryClient.invalidateQueries({ queryKey: ["school-plan"] });
   };
 
   const exportData = async () => {

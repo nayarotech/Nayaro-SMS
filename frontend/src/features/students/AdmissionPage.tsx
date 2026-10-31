@@ -15,8 +15,9 @@ import { todayAd } from "@/lib/dates";
 import { generatePassword } from "@/lib/password";
 import { applyApiErrors } from "@/lib/forms";
 import { useClasses } from "../academic/academic.api";
+import { PlanNotice } from "./PlanNotice";
 import { GuardianPicker } from "./GuardianPicker";
-import { RELATIONS, type Gender, type Relation, type StudentDetail } from "./students.api";
+import { RELATIONS, usePlan, type Gender, type Relation, type StudentDetail } from "./students.api";
 
 interface GuardianEntry {
   /** Set when linking an existing parent (e.g. a sibling's) */
@@ -71,6 +72,7 @@ export function AdmissionPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { data: classes = [] } = useClasses();
+  const { data: plan } = usePlan();
   const autoAdmissionNo = user?.settings?.["students.autoAdmissionNo"] !== false;
 
   const [photo, setPhoto] = useState<{ key: string; url: string } | null>(null);
@@ -149,7 +151,7 @@ export function AdmissionPage() {
         documents: uploaded,
       });
 
-      await Promise.all(["students", "dashboard", "guardians", "classes"].map((key) => queryClient.invalidateQueries({ queryKey: [key] })));
+      await Promise.all(["students", "dashboard", "guardians", "classes", "school-plan"].map((key) => queryClient.invalidateQueries({ queryKey: [key] })));
       toast.success(`${student.fullName} admitted · ${student.admissionNo}`);
       navigate(`/students/${student.id}`);
     } catch (e) {
@@ -158,9 +160,20 @@ export function AdmissionPage() {
     }
   });
 
+  // A full plan can't take new students; say so before anyone fills in the form
+  if (plan?.full) {
+    return (
+      <div className="mx-auto max-w-4xl space-y-6">
+        <PageHeader title="New admission" />
+        <PlanNotice />
+      </div>
+    );
+  }
+
   return (
     <form onSubmit={onSubmit} className="mx-auto max-w-4xl space-y-6">
       <PageHeader title="New admission" description="Student details, class, parents and documents — saved together." />
+      <PlanNotice />
       <FormError message={formError} />
 
       <Card title="Student">

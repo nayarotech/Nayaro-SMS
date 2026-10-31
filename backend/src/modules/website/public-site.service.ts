@@ -2,7 +2,6 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { env } from "../../config/env.js";
 import { formatBsLong, toDateString } from "../../lib/nepali-date.js";
 import { prisma } from "../../lib/prisma.js";
-import { publicFileUrl } from "../files/file.service.js";
 import { SYSTEM_ROLE_KEYS } from "../permissions/default-roles.js";
 import { getSchoolSettings } from "../settings/settings.service.js";
 import { getBlock } from "./renderer/blocks/index.js";
@@ -67,7 +66,7 @@ export async function renderSitePath(site: LoadedSite, path: string, query: URLS
       const post = await prisma.websitePost.findFirst({ where: { schoolId: site.school.id, type, slug: second, status: "PUBLISHED" } });
       if (!post) return notFound(site, basePath, origin, path);
       const ctx = baseContext(site, basePath, emptyData());
-      const attachments = ((post.attachments as { title: string; fileKey: string }[]) ?? []).map((a) => ({ title: a.title, url: publicFileUrl(a.fileKey) }));
+      const attachments = ((post.attachments as { title: string; fileKey: string }[]) ?? []).map((a) => ({ title: a.title, url: siteFileUrl(a.fileKey) }));
       return page(site, basePath, origin, path, 200, post.title, systemPages.postDetailPage({ ...toPostSummary(post), content: post.content, attachments }, ctx), undefined, post.excerpt ?? undefined, post.coverImageKey);
     }
     const pageNumber = Math.max(1, Number(query.get("page")) || 1);
@@ -125,6 +124,13 @@ export function verifyPreviewToken(pageId: string, token: string): boolean {
 
 // ─── Building blocks of a response ───────────────────────────
 
+/**
+ * Sites are always served by this API (at /sites/<CODE>, a subdomain or the school's
+ * own domain), so files are linked relative to the site. That works on any address,
+ * over http or https, without depending on PUBLIC_API_URL.
+ */
+const siteFileUrl = (key: string) => `/api/files/public/${key}`;
+
 function baseContext(site: LoadedSite, basePath: string, data: SiteData): RenderContext {
   return {
     site: {
@@ -139,7 +145,7 @@ function baseContext(site: LoadedSite, basePath: string, data: SiteData): Render
     data,
     pages: site.pages.map((p) => ({ id: p.id, title: p.title, slug: p.slug })),
     basePath,
-    fileUrl: publicFileUrl,
+    fileUrl: siteFileUrl,
     formatDate: (date) => {
       const display = site.settings["localization.dateDisplay"];
       if (display === "ad") return new Date(date).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
@@ -181,7 +187,8 @@ function page(
       title: fullTitle,
       description: description || seo.description || site.school.name,
       canonicalUrl: `${origin}${basePath}${path}`,
-      ogImageUrl: ogImage ? publicFileUrl(ogImage) : null,
+      // Social networks need a full address
+      ogImageUrl: ogImage ? `${origin}${siteFileUrl(ogImage)}` : null,
       body,
       robots,
     }),

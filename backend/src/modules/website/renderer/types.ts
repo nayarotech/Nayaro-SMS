@@ -117,7 +117,7 @@ export interface RenderContext {
   site: SiteInfo;
   data: SiteData;
   pages: PageLink[];
-  /** "/sites/DEMO" in development, "" on the school's own domain */
+  /** "/sites/SXS" in development, "" on the school's own domain */
   basePath: string;
   /** Public URL for an uploaded file key */
   fileUrl: (key: string) => string;

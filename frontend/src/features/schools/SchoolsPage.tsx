@@ -21,7 +21,9 @@ interface School {
   phone: string | null;
   email: string | null;
   isActive: boolean;
+  studentLimit: number | null;
   createdAt: string;
+  /** Active students, which is what the plan counts */
   studentCount: number;
   userCount: number;
 }
@@ -31,6 +33,7 @@ export function SchoolsPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [creating, setCreating] = useState(false);
+  const [planFor, setPlanFor] = useState<School | null>(null);
   const { reload } = useAuth();
   const navigate = useNavigate();
   const toast = useToast();
@@ -93,7 +96,7 @@ export function SchoolsPage() {
               ),
             },
             { header: "Code", cell: (s) => <span className="font-mono text-xs">{s.code}</span> },
-            { header: "Students", cell: (s) => s.studentCount, className: "tabular-nums" },
+            { header: "Students / plan", cell: (s) => <PlanUsage school={s} onEdit={() => setPlanFor(s)} /> },
             { header: "Users", cell: (s) => s.userCount, className: "tabular-nums" },
             { header: "Status", cell: (s) => (s.isActive ? <Badge tone="green">Active</Badge> : <Badge tone="red">Suspended</Badge>) },
             {
@@ -116,7 +119,71 @@ export function SchoolsPage() {
       </Card>
 
       <CreateSchoolModal open={creating} onClose={() => setCreating(false)} />
+      {planFor && <PlanModal school={planFor} onClose={() => setPlanFor(null)} />}
     </div>
+  );
+}
+
+/** "142 / 150" with a bar; red when full, amber when nearly full. Click to change the plan. */
+function PlanUsage({ school, onEdit }: { school: School; onEdit: () => void }) {
+  const limit = school.studentLimit;
+  const used = limit ? school.studentCount / limit : 0;
+  const tone = used >= 1 ? "bg-red-500" : used >= 0.9 ? "bg-amber-500" : "bg-brand";
+  return (
+    <button onClick={onEdit} className="group w-36 text-left" title="Change student limit">
+      <span className="block text-sm tabular-nums text-slate-900">
+        {school.studentCount} / {limit ?? "no limit"}
+        <span className="ml-1 text-xs text-brand opacity-0 group-hover:opacity-100">Change</span>
+      </span>
+      {limit !== null && (
+        <span className="mt-1 block h-1.5 overflow-hidden rounded-full bg-slate-100">
+          <span className={`block h-full rounded-full ${tone}`} style={{ width: `${Math.min(100, used * 100)}%` }} />
+        </span>
+      )}
+    </button>
+  );
+}
+
+/** Change how many active students a school has paid for (e.g. after they buy a bigger plan). */
+function PlanModal({ school, onClose }: { school: School; onClose: () => void }) {
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  const [limit, setLimit] = useState(school.studentLimit?.toString() ?? "");
+  const value = limit === "" ? null : Number(limit);
+  const invalid = value !== null && (!Number.isInteger(value) || value < 1);
+
+  const save = useMutation({
+    mutationFn: () => api.patch(`/schools/${school.id}`, { studentLimit: value }),
+    onSuccess: async () => {
+      toast.success(`${school.name}: ${value === null ? "no student limit" : `${value} students`}`);
+      await queryClient.invalidateQueries({ queryKey: ["schools"] });
+      onClose();
+    },
+    onError: (e) => toast.error(errorMessage(e)),
+  });
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={`Student limit · ${school.name}`}
+      description={`They have ${school.studentCount} active students now. Students who left, transferred or graduated don't count.`}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button disabled={invalid} loading={save.isPending} onClick={() => save.mutate()}>Save</Button>
+        </>
+      }
+    >
+      <Field label="Active students allowed" error={invalid ? "Enter a whole number, 1 or more" : undefined} hint="Leave empty for no limit">
+        <Input type="number" min={1} step={1} value={limit} onChange={(e) => setLimit(e.target.value)} autoFocus />
+      </Field>
+      {value !== null && !invalid && value < school.studentCount && (
+        <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          This is below their current {school.studentCount} active students. Nobody is removed, but they can't admit anyone until they're under the limit.
+        </p>
+      )}
+    </Modal>
   );
 }
 
@@ -126,6 +193,7 @@ interface CreateSchoolForm {
   address: string;
   phone: string;
   email: string;
+  studentLimit: string;
   admin: { fullName: string; email: string; phone: string; password: string };
 }
 
@@ -143,7 +211,7 @@ function CreateSchoolModal({ open, onClose }: { open: boolean; onClose: () => vo
 
   const onSubmit = handleSubmit(async (values) => {
     try {
-      await api.post("/schools", { ...emptyToNull(values), admin: emptyToNull(values.admin) });
+      await api.post("/schools", { ...emptyToNull(values), studentLimit: Number(values.studentLimit), admin: emptyToNull(values.admin) });
       toast.success(`${values.name} created`);
       await queryClient.invalidateQueries({ queryKey: ["schools"] });
       close();
@@ -189,6 +257,17 @@ function CreateSchoolModal({ open, onClose }: { open: boolean; onClose: () => vo
           </Field>
           <Field label="Address" error={errors.address?.message}>
             <Input {...register("address")} />
+          </Field>
+          <Field label="Student limit" required error={errors.studentLimit?.message} hint="Active students they paid for. They can't admit more until you raise it.">
+            <Input
+              type="number"
+              min={1}
+              step={1}
+              {...register("studentLimit", {
+                required: "Required",
+                validate: (v) => (Number.isInteger(Number(v)) && Number(v) >= 1) || "Enter a whole number, 1 or more",
+              })}
+            />
           </Field>
         </div>
 

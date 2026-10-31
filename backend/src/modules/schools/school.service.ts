@@ -14,6 +14,8 @@ export interface CreateSchoolInput {
   address?: string | null;
   phone?: string | null;
   email?: string | null;
+  /** Students the school paid for (null = no limit) */
+  studentLimit?: number | null;
   admin: { fullName: string; email: string; phone?: string | null; password: string };
 }
 
@@ -24,6 +26,7 @@ export interface UpdateSchoolInput {
   email?: string | null;
   isActive?: boolean;
   logoKey?: string | null;
+  studentLimit?: number | null;
 }
 
 /**
@@ -36,7 +39,7 @@ export async function createSchool(input: CreateSchoolInput) {
 
   return prisma.$transaction(async (tx) => {
     const school = await tx.school.create({
-      data: { name: input.name, code, address: input.address, phone: input.phone, email: input.email, settings: {} },
+      data: { name: input.name, code, address: input.address, phone: input.phone, email: input.email, studentLimit: input.studentLimit ?? null, settings: {} },
     });
 
     await provisionDefaultRoles(tx, school.id);
@@ -67,7 +70,7 @@ export async function listSchools(params: { search?: string; page: number; pageS
     prisma.school.findMany({
       where,
       orderBy: { createdAt: "desc" },
-      include: { _count: { select: { students: true, users: true } } },
+      include: { _count: { select: { students: { where: { status: "ACTIVE" } }, users: true } } },
       ...paginate(params.page, params.pageSize),
     }),
     prisma.school.count({ where }),
@@ -76,6 +79,7 @@ export async function listSchools(params: { search?: string; page: number; pageS
   return {
     items: schools.map((school) => ({
       ...toSchoolDto(school),
+      /** Active students — what the plan counts */
       studentCount: school._count.students,
       userCount: school._count.users,
     })),
@@ -119,6 +123,7 @@ function toSchoolDto(school: {
   email: string | null;
   logoKey: string | null;
   isActive: boolean;
+  studentLimit: number | null;
   createdAt: Date;
 }) {
   return {
@@ -130,6 +135,7 @@ function toSchoolDto(school: {
     email: school.email,
     logoUrl: fileUrl(school.logoKey),
     isActive: school.isActive,
+    studentLimit: school.studentLimit,
     createdAt: school.createdAt,
   };
 }

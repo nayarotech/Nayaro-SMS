@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { formatBs, useI18n } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
-import type { Child, ChildProfile, SchoolNote } from "@/lib/types";
+import type { Child, ChildHomework, ChildProfile, SchoolNote } from "@/lib/types";
 import { useCachedFetch } from "@/lib/use-cached";
 import { Card, colors } from "./ui";
 
@@ -89,6 +89,7 @@ function ChildSummary({ child }: { child: Child }) {
   const { data: attendance } = useCachedFetch<AttendanceSummary>(`${base}/attendance`);
   const { data: results } = useCachedFetch<ResultSummary[]>(`${base}/results`);
   const { data: notes } = useCachedFetch<SchoolNote[]>(`${base}/notes`);
+  const { data: homework } = useCachedFetch<ChildHomework[]>(`${base}/homework?when=upcoming`);
   const latest = results?.[0];
   const lowAttendance = (attendance?.percent ?? 100) < 75;
   const history = profile?.history ?? [];
@@ -131,6 +132,19 @@ function ChildSummary({ child }: { child: Child }) {
             <Text style={styles.tileNote}>{t("noneYet")}</Text>
           )}
         </Tile>
+        <Tile icon="book-outline" title={t("homework")} onPress={() => router.push("/homework")}>
+          {homework?.length ? (
+            <>
+              <Text style={styles.tileValue}>{homework.length}</Text>
+              <Text style={styles.tileNote} numberOfLines={1}>{t("upcoming")} · {homework[0].subject.name}</Text>
+            </>
+          ) : (
+            <Text style={styles.tileNote}>{t("noneYet")}</Text>
+          )}
+        </Tile>
+        <Tile icon="library-outline" title={t("materials")} onPress={() => router.push("/materials")}>
+          <Text style={styles.tileNote}>{t("open")}</Text>
+        </Tile>
         <Tile icon="ribbon-outline" title={t("notes")} onPress={() => router.push("/notes")} wide>
           {notes?.length ? (
             <>
@@ -142,7 +156,7 @@ function ChildSummary({ child }: { child: Child }) {
           )}
         </Tile>
       </View>
-      <Text style={styles.coming}>{t("moreComing")}</Text>
+      <Text style={styles.coming}>{t("moreComing2")}</Text>
 
       {history.length > 1 && (
         <Card style={{ gap: 12 }}>

@@ -11,7 +11,8 @@ School management system for schools in Nepal: a web dashboard for school staff,
 ## Features
 
 **Schools, users and permissions**
-- Platform owner creates schools, suspends or reactivates them, and can open any school for support
+- Platform owner creates schools, sets each school's student limit (its plan), suspends or reactivates them, and can open any school for support
+- Student limit per school: only active students count; at the limit, admissions stop and the school is asked to contact you to upgrade
 - Login with email/phone and password, or phone and SMS code (Sparrow SMS). One phone number can belong to several schools
 - 8 built-in roles, custom roles, around 50 permissions, and per-user exceptions; audit log of every change
 - School settings: branding, BS/AD dates, working days, admission number format, modules on/off, English and Nepali interface
@@ -37,9 +38,15 @@ School management system for schools in Nepal: a web dashboard for school staff,
 - NEB letter grading and GPA (editable scale), ledgers, ranks and branded PDF report cards
 - Year-end promotion one class at a time: suggestions from results and attendance, promote/detain/graduate in bulk, undo
 
+**Homework and study materials**
+- Teachers post homework for their sections and subjects (several sections at once) from the web or phone, with photos from the camera, PDFs and office files; a coordinator can post for any teacher
+- Parents are notified and see each child's upcoming and past homework; optional-subject homework reaches only the students who take it
+- After the due date the teacher ticks Done / Partly / Not done; parents see it and are told when homework wasn't done
+- Study materials (notes, worksheets, slides, video links) per class or section and subject, which parents and students browse by subject
+
 **Mobile app**
-- Parents: each child's attendance, results, notes from school and notifications
-- Teachers: today's attendance, marks entry, and their own children if they are also parents
+- Parents: each child's attendance, results, homework, study materials, notes from school and notifications
+- Teachers: today's attendance, homework (post with photos, check who did it), study materials, marks entry, and their own children if they are also parents
 - English and Nepali; keeps working on a weak connection
 
 **School website**
@@ -61,14 +68,13 @@ cd Nayaro-SMS
 ./dev.sh
 ```
 
-`dev.sh` starts MySQL and Redis in Docker, installs dependencies, creates the `.env` files from the examples, runs the database migrations, loads demo data, then starts the API, the web dashboard and the mobile app. Press Ctrl+C to stop everything. Logs are written to `.dev-logs/`.
+`dev.sh` starts MySQL and Redis in Docker, installs dependencies, creates the `.env` files from the examples, runs the database migrations, creates the super admin account, then starts the API, the web dashboard and the mobile app. Press Ctrl+C to stop everything. Logs are written to `.dev-logs/`.
 
 | Open | Address |
 | --- | --- |
 | Web dashboard | http://localhost:5173 |
 | API | http://localhost:4000 (docs at http://localhost:4000/api/docs) |
 | Mobile app in a browser | http://localhost:8081 |
-| Demo school website | http://localhost:4000/sites/DEMO |
 
 To use the mobile app on your phone, install **Expo Go** and scan the QR code that `dev.sh` prints. The phone and computer must be on the same Wi-Fi; if they can't reach each other, run `./dev.sh --tunnel`.
 
@@ -85,7 +91,7 @@ cd backend
 cp .env.example .env          # then change the three secrets (see below)
 npm install
 npx prisma migrate dev
-npm run db:seed               # demo school, staff, ~145 students, exams and attendance
+npm run db:seed               # creates the super admin account
 npm run dev
 
 # 3. Web dashboard → http://localhost:5173   (new terminal)
@@ -101,22 +107,25 @@ npm install
 npx expo start
 ```
 
-## Demo logins
+## First login
 
-Created by `npm run db:seed`. School code: **DEMO**.
+`npm run db:seed` creates one account, the **platform owner (super admin)**. Its email and password come from `backend/.env`:
 
-| Who | Login | Password |
-| --- | --- | --- |
-| Platform owner | `superadmin@sms.local` | `SuperAdmin@123` |
-| School admin | `admin@demo.school` | `Password@123` |
-| Principal | `ramesh@demo.school` | `Password@123` |
-| Class and subject teacher | `sunita@demo.school` | `Password@123` |
-| Teacher who is also a parent | `deepak@demo.school` | `Password@123` |
-| Proxy teacher | `pratima@demo.school` | `Password@123` |
-| Parent with two children (mobile) | `9811000099` | `Parent@123`, or an SMS code |
-| Parent of a Grade 5 student (mobile) | `9811000145` | `Parent@123`, or an SMS code |
+```
+SEED_SUPER_ADMIN_EMAIL=superadmin@sms.local
+SEED_SUPER_ADMIN_PASSWORD=SuperAdmin@123
+```
 
-In development, SMS codes are printed in the API log and shown on the login screen instead of being sent (`SMS_PROVIDER=console`).
+Change them before seeding a real server. Then:
+
+1. Sign in to the web dashboard as the super admin.
+2. **Schools → New school**: enter the school's details, its **student limit** (how many active students it paid for) and its first School Admin login.
+3. Give the School Admin their login. They set up academic years, classes, subjects and staff, then admit students.
+4. When a school buys a bigger plan, click its **Students / plan** figure on the Schools page and raise the limit. Leave it empty for no limit.
+
+Only active students count towards the limit; students who left, transferred or graduated free their place. When a school reaches its limit, new admissions (and re-activating a student who left) are refused with a message to contact you, using `SALES_CONTACT` from `backend/.env`.
+
+In development, SMS login codes are printed in the API log and shown on the login screen instead of being sent (`SMS_PROVIDER=console`).
 
 ## Configuration
 
@@ -133,6 +142,8 @@ Each app has a `.env.example`; copy it to `.env`. `.env` files are never committ
 | `CORS_ORIGINS` | Web addresses allowed to call the API (dashboard, mobile web) |
 | `SMS_PROVIDER` | `console` in development, `sparrow` to send real SMS (`SPARROW_SMS_TOKEN`, `SPARROW_SMS_FROM`) |
 | `PDF_CHROME_PATH` | Path to Chrome/Chromium if it isn't found automatically |
+| `SALES_CONTACT` | Shown to a school that reaches its student limit, e.g. `Nayaro Tech · 98XXXXXXXX · sales@example.com` |
+| `SEED_SUPER_ADMIN_EMAIL`, `SEED_SUPER_ADMIN_PASSWORD` | The platform owner account created by `npm run db:seed` |
 | `SITES_BASE_DOMAIN` | Optional: serve school websites at `<code>.<domain>` (needs wildcard DNS) |
 | `STORAGE_LOCAL_DIR` | Where uploaded photos and documents are stored |
 
@@ -145,10 +156,10 @@ Each app has a `.env.example`; copy it to `.env`. `.env` files are never committ
 | Where | Command | Does |
 | --- | --- | --- |
 | backend | `npm run dev` | API with reload on change |
-| backend | `npm test` | Tests (uses a separate `sms_test` database; demo data is untouched) |
+| backend | `npm test` | Tests (use a separate `sms_test` database, so your data is untouched) |
 | backend | `npm run typecheck` | Type check |
 | backend | `npx prisma migrate dev --name <change>` | Create a migration after editing `prisma/schema.prisma` |
-| backend | `npm run db:seed` | Load demo data (safe to run again) |
+| backend | `npm run db:seed` | Create the super admin account (safe to run again) |
 | backend | `npm run db:reset` | Delete everything and start over (asks no questions) |
 | frontend | `npm run dev` / `npm run build` | Dashboard dev server / production build into `dist/` |
 | mobile | `npx expo start` | Mobile dev server (QR code for Expo Go) |
@@ -178,7 +189,7 @@ Set `NODE_ENV=production`, real secrets, `SMS_PROVIDER=sparrow`, and install Chr
 backend/
   prisma/schema.prisma       database schema (MySQL)
   prisma/migrations/         migrations
-  prisma/seed.ts             demo data
+  prisma/seed.ts             creates the super admin
   src/config/env.ts          environment variables, checked at startup
   src/http/                  route definitions → Express router + OpenAPI docs, auth, errors
   src/lib/                   database, Redis, storage, SMS, BS⇄AD dates, PDFs
@@ -234,6 +245,10 @@ Every query is limited to the logged-in user's school. Services take the school 
 ## Troubleshooting
 
 - **`dev.sh` says a port is in use**: something is already running on 4000, 5173 or 8081. Stop it, or stop the old `dev.sh`.
+- **Port 4000 is used by another project**: start the API on another port (`PORT=4100 npm run dev` in `backend/`) and the dashboard with `API_PROXY_TARGET=http://localhost:4100 npm run dev` in `frontend/`.
+- **`dev.sh` stops at "Updating the database"**: it now prints the error. Common causes:
+  - *Another MySQL on port 3306* (e.g. installed with Homebrew). It answers instead of the Docker database and rejects the `root`/`root` login. Stop it (`brew services stop mysql`) or move one of them to another port.
+  - *"failed migrations" (P3009)*: the migration history in the database was lost or a migration was interrupted. If the tables are already there, check the database matches the schema with `npx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script` (in `backend/`). If it prints an empty migration, mark the history as applied: `npx prisma migrate resolve --rolled-back <failed migration>` and then `npx prisma migrate resolve --applied <name>` for each folder in `prisma/migrations`. On a development machine with nothing to keep, `npm run db:reset` starts over instead.
 - **PDF download fails**: install Chrome/Chromium or set `PDF_CHROME_PATH`.
 - **Phone can't reach the API**: `mobile/.env` must use your computer's Wi-Fi IP (not `localhost`), and both must be on the same network; or run `./dev.sh --tunnel`.
 - **Prisma errors after pulling changes**: run `npx prisma migrate dev` and `npx prisma generate` in `backend/`.

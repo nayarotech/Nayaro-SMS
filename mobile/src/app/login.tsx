@@ -74,7 +74,7 @@ export default function LoginScreen() {
       await finish({ status: "ok", ...(await api.post<{ accessToken: string; refreshToken: string }>("/auth/select-school", { selectionToken: step.result.selectionToken, userId })) });
     });
 
-  const schoolField = <TextField label={t("schoolCode")} value={schoolCode} onChangeText={(v) => setSchoolCode(v.toUpperCase())} autoCapitalize="characters" autoCorrect={false} placeholder="e.g. DEMO" maxLength={12} />;
+  const schoolField = <TextField label={t("schoolCode")} value={schoolCode} onChangeText={(v) => setSchoolCode(v.toUpperCase())} autoCapitalize="characters" autoCorrect={false} placeholder="e.g. SXS" maxLength={12} />;
 
   return (
     <SafeAreaView style={styles.screen}>

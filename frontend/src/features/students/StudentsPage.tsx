@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { Button } from "@/components/ui/Button";
 import { Avatar, Badge, Card, EmptyState, PageHeader } from "@/components/ui/display";
+import { PlanNotice } from "./PlanNotice";
 import { Input, Select } from "@/components/ui/form";
 import { Pagination, Table } from "@/components/ui/Table";
 import { api, type Paginated } from "@/lib/api";
@@ -50,6 +51,7 @@ export function StudentsPage() {
           )
         }
       />
+      <PlanNotice always className="mb-4" />
       <Card padded={false}>
         <div className="flex flex-wrap gap-3 border-b border-slate-100 p-4">
           <Input

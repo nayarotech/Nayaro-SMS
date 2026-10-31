@@ -122,11 +122,10 @@ export const PERMISSION_GROUPS = [
   {
     key: "learning",
     label: "Homework & materials",
-    comingSoon: true,
     permissions: [
-      { key: "homework.post", label: "Post homework" },
-      { key: "homework.post_on_behalf", label: "Post homework on behalf of any teacher" },
-      { key: "material.upload", label: "Upload course materials" },
+      { key: "homework.post", label: "Post and check homework (for assigned subjects and own section)" },
+      { key: "homework.post_on_behalf", label: "Post and manage homework for any teacher" },
+      { key: "material.upload", label: "Upload course materials (for assigned subjects and own section)" },
     ],
   },
   {

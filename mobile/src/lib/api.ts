@@ -64,13 +64,15 @@ async function refreshOnce(): Promise<boolean> {
 async function request<T>(method: string, path: string, body?: unknown, retry = true): Promise<T> {
   let response: Response;
   try {
+    const isForm = typeof FormData !== "undefined" && body instanceof FormData;
     response = await fetch(BASE_URL + path, {
       method,
       headers: {
-        "Content-Type": "application/json",
+        // FormData sets its own multipart content type
+        ...(isForm ? {} : { "Content-Type": "application/json" }),
         ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: body === undefined ? undefined : isForm ? (body as FormData) : JSON.stringify(body),
     });
   } catch {
     throw new ApiError(0, "OFFLINE", "No internet connection");
@@ -84,6 +86,25 @@ async function request<T>(method: string, path: string, body?: unknown, retry = 
     throw new ApiError(response.status, data?.error?.code ?? "ERROR", data?.error?.message ?? "Something went wrong");
   }
   return data as T;
+}
+
+/** A picked photo or document (from expo-image-picker / expo-document-picker). */
+export interface PickedFile {
+  uri: string;
+  name: string;
+  mimeType: string;
+  /** Only in the browser build */
+  file?: File;
+}
+
+/** Upload a picked file; returns the key to attach to homework or materials. */
+export function uploadFile(picked: PickedFile, purpose: "homework-file" | "material-file") {
+  const form = new FormData();
+  form.append("purpose", purpose);
+  if (picked.file) form.append("file", picked.file);
+  // React Native sends { uri, name, type } as a file part
+  else form.append("file", { uri: picked.uri, name: picked.name, type: picked.mimeType } as unknown as Blob);
+  return request<{ key: string; url: string; originalName: string; mimeType: string }>("POST", "/files", form);
 }
 
 export const api = {

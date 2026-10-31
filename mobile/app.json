@@ -24,7 +24,14 @@
     },
     "plugins": [
       "expo-secure-store",
-      "expo-router"
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Choose photos of homework, notes and worksheets to share with students.",
+          "cameraPermission": "Take photos of homework, notes and worksheets to share with students."
+        }
+      ]
     ],
     "scheme": "smsapp",
     "experiments": {

@@ -31,6 +31,8 @@ import { MarkSheetPage } from "./features/exams/MarkSheetPage";
 import { MarksHomePage } from "./features/exams/MarksHomePage";
 import { ResultsPage } from "./features/exams/ResultsPage";
 import { PromotionPage } from "./features/promotions/PromotionPage";
+import { HomeworkPage } from "./features/learning/HomeworkPage";
+import { MaterialsPage } from "./features/learning/MaterialsPage";
 import { PageEditor } from "./features/website/editor/PageEditor";
 import { WebsiteLayout } from "./features/website/WebsiteLayout";
 import { EnquiriesPage } from "./features/website/EnquiriesPage";
@@ -79,6 +81,8 @@ export const router = createBrowserRouter([
           { path: "exams/:examId/marks/:sectionId/:subjectId", element: guard(MARKS_ANY, <MarkSheetPage />) },
           { path: "exams/results", element: guard(RESULTS_ANY, <ResultsPage />) },
           { path: "promotions", element: guard("promotion.manage", <PromotionPage />) },
+          { path: "homework", element: guard(["homework.post", "homework.post_on_behalf", "student.record.view"], <HomeworkPage />) },
+          { path: "materials", element: guard(["material.upload", "homework.post", "homework.post_on_behalf", "student.record.view"], <MaterialsPage />) },
 
           { path: "academic/years", element: guard("academic.view", <AcademicYearsPage />) },
           { path: "academic/classes", element: guard("academic.view", <ClassesPage />) },

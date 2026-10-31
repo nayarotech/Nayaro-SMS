@@ -10,6 +10,7 @@ import { useAuth } from "@/lib/auth";
 import { formatBsLong } from "@/lib/dates";
 import { useFormatDate } from "@/lib/use-format-date";
 import { SchoolsPage } from "../schools/SchoolsPage";
+import { PlanNotice } from "../students/PlanNotice";
 
 interface DashboardData {
   today: { ad: string; bs: string };
@@ -59,6 +60,7 @@ function SchoolDashboard() {
 
   return (
     <div>
+      <PlanNotice className="mb-4" />
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-xl font-semibold text-slate-900">{t("dashboard.welcome", { name: user?.fullName.split(" ")[0] })}</h1>

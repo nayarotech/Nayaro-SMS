@@ -4,7 +4,7 @@ import express from "express";
 import helmet from "helmet";
 import { pinoHttp } from "pino-http";
 import swaggerUi from "swagger-ui-express";
-import { env } from "./config/env.js";
+import { env, isProduction } from "./config/env.js";
 import { logger } from "./lib/logger.js";
 import { errorHandler, notFoundHandler } from "./http/error-handler.js";
 import { buildOpenApiDocument } from "./http/openapi.js";
@@ -33,6 +33,9 @@ export function createApp() {
           "frame-src": ["https://www.youtube-nocookie.com", "https://www.google.com"],
           "form-action": ["'self'"],
           "frame-ancestors": ["'self'", ...env.CORS_ORIGINS],
+          // Only upgrade http links to https in production: in development sites are
+          // opened over plain http (e.g. on the Wi-Fi address from a phone)
+          "upgrade-insecure-requests": isProduction ? [] : null,
         },
       },
     }),

@@ -75,3 +75,57 @@ export interface GradeBand {
   grade: string;
   gradePoint: number;
 }
+
+export interface Attachment {
+  key: string;
+  name: string;
+  mimeType: string;
+  size: number;
+  url: string;
+}
+
+export type HomeworkStatus = "DONE" | "PARTIAL" | "NOT_DONE";
+
+/** Homework as a parent sees it */
+export interface ChildHomework {
+  id: string;
+  subject: { id: string; name: string };
+  teacher: string;
+  title: string;
+  description: string | null;
+  assignedDate: string;
+  dueDate: string;
+  dueDateBs: string;
+  attachments: Attachment[];
+  status: HomeworkStatus | null;
+  remark: string | null;
+}
+
+/** Homework as a teacher sees it */
+export interface TeacherHomework {
+  id: string;
+  section: { id: string; name: string; className: string };
+  subject: { id: string; name: string };
+  title: string;
+  dueDate: string;
+  attachments: Attachment[];
+  checked: number;
+  students?: number;
+}
+
+export interface StudyMaterial {
+  id: string;
+  subject: { id: string; name: string };
+  section: { id: string; name: string } | null;
+  title: string;
+  description: string | null;
+  link: string | null;
+  attachments: Attachment[];
+  postedBy: { fullName: string };
+  createdAt: string;
+}
+
+export interface PostingOptions {
+  onBehalf: boolean;
+  classes: { id: string; name: string; subjects: { id: string; name: string; sectionIds: string[] }[]; sections: { id: string; name: string }[] }[];
+}

@@ -20,6 +20,7 @@ mkdir -p "$LOGS"
 bold() { printf "\033[1m%s\033[0m\n" "$1"; }
 step() { printf "\n\033[1;34m▸ %s\033[0m\n" "$1"; }
 fail() { printf "\033[1;31m✖ %s\033[0m\n" "$1"; exit 1; }
+warn() { printf "\033[1;33m! %s\033[0m\n" "$1"; }
 
 # ─── Checks ──────────────────────────────────────────────────
 command -v docker >/dev/null || fail "Docker is not installed (https://docs.docker.com/desktop/)"
@@ -43,6 +44,13 @@ printf "  waiting for MySQL"
 until docker compose exec -T mysql mysqladmin ping -uroot -proot --silent >/dev/null 2>&1; do printf "."; sleep 2; done
 echo " ready"
 
+# A MySQL installed on this computer (e.g. Homebrew) can answer on 127.0.0.1:3306
+# instead of the Docker one, and it won't accept the project's root/root login
+OTHER_MYSQL=$(lsof -nP -iTCP:3306 -sTCP:LISTEN 2>/dev/null | awk 'NR > 1 && $1 !~ /^com\.docke|^docker|^vpnkit/ { print $1 " (pid " $2 ")"; exit }')
+if [ -n "$OTHER_MYSQL" ]; then
+  warn "Another MySQL is also using port 3306: $OTHER_MYSQL. If the database step fails, stop it (Homebrew: brew services stop mysql)."
+fi
+
 # ─── Install & prepare (only what's missing) ─────────────────
 for app in backend frontend mobile; do
   if [ ! -d "$app/node_modules" ]; then
@@ -53,7 +61,11 @@ done
 [ -f backend/.env ] || cp backend/.env.example backend/.env
 
 step "Updating the database"
-(cd backend && npx prisma migrate deploy >/dev/null 2>&1 && npx prisma generate >/dev/null 2>&1 && npm run db:seed --silent) | sed 's/^/  /'
+if ! DB_OUTPUT=$(cd backend && npx prisma migrate deploy 2>&1 && npx prisma generate >/dev/null 2>&1 && npm run db:seed --silent 2>&1); then
+  echo "$DB_OUTPUT" | tail -15 | sed 's/^/  /'
+  fail "Couldn't update the database (error above). See \"Troubleshooting\" in README.md."
+fi
+echo "$DB_OUTPUT" | grep "✔" | sed 's/^/  /' || true
 echo "  database is up to date"
 
 # The phone needs the computer's network address, not "localhost"
@@ -89,12 +101,11 @@ cat <<EOF
 $(bold "Everything is running")
 
   Web admin       http://localhost:5173        (on your phone's browser: http://$LAN_IP:5173)
-  School website  http://localhost:4000/sites/DEMO
   API docs        http://localhost:4000/api/docs
 
-  Logins          admin@demo.school / Password@123      (school admin)
-                  sunita@demo.school / Password@123     (class teacher)
-                  Parent app: phone 9811000145 → the OTP is shown on screen
+  Sign in as the platform owner (SEED_SUPER_ADMIN_EMAIL / SEED_SUPER_ADMIN_PASSWORD
+  in backend/.env, by default superadmin@sms.local / SuperAdmin@123), then create
+  a school under Schools.
 
 $(bold "Mobile app on your phone")
   1. Install "Expo Go" from the Play Store / App Store

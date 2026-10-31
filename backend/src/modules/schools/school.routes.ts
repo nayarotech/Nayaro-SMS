@@ -2,7 +2,11 @@ import { z } from "zod";
 import { defineModule, route } from "../../http/route.js";
 import { idParam, optionalText, pagination, phoneNumber } from "../../http/schemas.js";
 import { assertFileBelongsToSchool } from "../files/file.service.js";
+import { getPlan } from "./plan.service.js";
 import * as schoolService from "./school.service.js";
+
+/** Only the platform owner sets the plan; schools can't change their own limit. */
+const studentLimit = z.number().int().min(1).max(100_000).nullable();
 
 const schoolFields = {
   name: z.string().trim().min(2).max(150),
@@ -34,6 +38,7 @@ export const schoolsModule = defineModule("/schools", "Schools (super admin)", [
         .string()
         .trim()
         .regex(/^[A-Za-z0-9-]{2,12}$/, "2–12 letters, numbers or dashes"),
+      studentLimit,
       admin: z.object({
         fullName: z.string().trim().min(2),
         email: z.email(),
@@ -56,10 +61,10 @@ export const schoolsModule = defineModule("/schools", "Schools (super admin)", [
   route({
     method: "patch",
     path: "/:id",
-    summary: "Update a school or suspend/reactivate it",
+    summary: "Update a school, change its student limit, or suspend/reactivate it",
     access: "superAdmin",
     params: idParam,
-    body: z.object({ ...schoolFields, isActive: z.boolean() }).partial(),
+    body: z.object({ ...schoolFields, isActive: z.boolean(), studentLimit }).partial(),
     handler: ({ params, body }) => schoolService.updateSchool(params.id, body),
   }),
 ]);
@@ -71,6 +76,13 @@ export const schoolProfileModule = defineModule("/school", "School profile", [
     path: "/",
     summary: "Get this school's profile",
     handler: ({ schoolId }) => schoolService.getSchool(schoolId),
+  }),
+
+  route({
+    method: "get",
+    path: "/plan",
+    summary: "Student limit of this school's plan and how much is used",
+    handler: ({ schoolId }) => getPlan(schoolId),
   }),
 
   route({

@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 
 export type Gender = "MALE" | "FEMALE" | "OTHER";
 export type Relation = "FATHER" | "MOTHER" | "GUARDIAN" | "GRANDPARENT" | "SIBLING" | "OTHER";
@@ -159,3 +160,19 @@ export const NOTE_CATEGORY: Record<NoteCategory, { label: string; tone: "green" 
   HEALTH: { label: "Health", tone: "amber" },
   GENERAL: { label: "General", tone: "gray" },
 };
+
+// ─── Plan (student limit) ───────────────────────────────────
+
+export interface Plan {
+  studentLimit: number | null;
+  activeStudents: number;
+  remaining: number | null;
+  full: boolean;
+  nearLimit: boolean;
+  salesContact: string | null;
+}
+
+export function usePlan() {
+  const { user } = useAuth();
+  return useQuery({ queryKey: ["school-plan"], queryFn: () => api.get<Plan>("/school/plan"), enabled: Boolean(user?.school), staleTime: 60_000 });
+}

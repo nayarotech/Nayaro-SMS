@@ -35,7 +35,7 @@ export default function TabsLayout() {
   if (status === "signedOut") return <Redirect href="/login" />;
 
   const can = (permission: string) => Boolean(me?.permissions?.includes(permission));
-  const isTeacher = can("attendance.mark") || can("attendance.proxy.assign") || can("marks.enter");
+  const isTeacher = can("attendance.mark") || can("attendance.proxy.assign") || can("marks.enter") || can("homework.post") || can("homework.post_on_behalf");
   const isParent = children.length > 0;
   const show = (visible: boolean) => (visible ? {} : { href: null });
 

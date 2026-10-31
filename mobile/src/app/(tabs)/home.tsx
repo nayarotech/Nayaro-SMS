@@ -4,6 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { TeacherMarks } from "@/components/MarkSheets";
 import { ParentHome } from "@/components/ParentHome";
 import { TeacherClasses } from "@/components/TeacherClasses";
+import { TeacherHomework } from "@/components/TeacherHomework";
 import { colors } from "@/components/ui";
 import { useI18n } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
@@ -18,6 +19,7 @@ export default function HomeScreen() {
   const can = (permission: string) => Boolean(me?.permissions?.includes(permission));
   const takesAttendance = can("attendance.mark") || can("attendance.proxy.assign");
   const entersMarks = can("marks.enter");
+  const postsHomework = can("homework.post") || can("homework.post_on_behalf");
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -34,9 +36,10 @@ export default function HomeScreen() {
       </View>
       <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} />}>
         <View key={refreshKey} style={{ gap: 16 }}>
-          {takesAttendance || entersMarks ? (
+          {takesAttendance || entersMarks || postsHomework ? (
             <View style={{ gap: 24 }}>
               {takesAttendance && <TeacherClasses canSeeAll={can("attendance.proxy.assign")} />}
+              {postsHomework && <TeacherHomework canAddMaterial={can("material.upload") || can("homework.post_on_behalf")} />}
               {entersMarks && <TeacherMarks />}
             </View>
           ) : (

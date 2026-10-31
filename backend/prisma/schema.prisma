@@ -21,19 +21,21 @@ datasource db {
 // ─────────────────────────────────────────────────────────────
 
 model School {
-  id        String   @id @default(uuid())
-  name      String
+  id           String   @id @default(uuid())
+  name         String
   /// Short unique code, e.g. "SXS" — used in admission numbers and support.
-  code      String   @unique
-  address   String?
-  phone     String?
-  email     String?
-  logoKey   String?
+  code         String   @unique
+  address      String?
+  phone        String?
+  email        String?
+  logoKey      String?
   /// Per-school setting overrides. Keys and defaults live in src/modules/settings/settings.registry.ts
-  settings  Json
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  settings     Json
+  /// Most ACTIVE students the school has paid for. Null = no limit. Set by the platform owner.
+  studentLimit Int?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   users              User[]
   roles              Role[]
@@ -65,6 +67,8 @@ model School {
   gradingScale       GradingScale?
   promotionRuns      PromotionRun[]
   studentNotes       StudentNote[]
+  homework           Homework[]
+  materials          Material[]
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -102,6 +106,8 @@ model User {
   proxyAssignments    ProxyAssignment[]        @relation("ProxyTeacher")
   notifications       Notification[]
   studentNotes        StudentNote[]
+  homeworkPosted      Homework[]               @relation("HomeworkPostedBy")
+  materials           Material[]
 
   @@unique([schoolId, email])
   @@unique([schoolId, phone])
@@ -271,6 +277,8 @@ model AcademicYear {
   attendanceDays     AttendanceDay[]
   exams              Exam[]
   subjectChoices     StudentSubject[]
+  homework           Homework[]
+  materials          Material[]
   promotionRunsFrom  PromotionRun[]           @relation("PromotionFromYear")
   promotionRunsTo    PromotionRun[]           @relation("PromotionToYear")
 
@@ -292,6 +300,7 @@ model SchoolClass {
   enrollments   Enrollment[]
   examSubjects  ExamSubject[]
   promotionRuns PromotionRun[]
+  materials     Material[]
 
   @@unique([schoolId, name])
 }
@@ -314,6 +323,8 @@ model Section {
   attendanceDays     AttendanceDay[]
   proxyAssignments   ProxyAssignment[]
   markSheets         MarkSheet[]
+  homework           Homework[]
+  materials          Material[]
 
   @@unique([classId, name])
 }
@@ -333,6 +344,8 @@ model Subject {
   examSubjects       ExamSubject[]
   markSheets         MarkSheet[]
   studentChoices     StudentSubject[]
+  homework           Homework[]
+  materials          Material[]
 
   @@unique([schoolId, name])
 }
@@ -484,6 +497,7 @@ model Student {
   notes              StudentNote[]
   promotionDecisions PromotionDecision[]
   subjectChoices     StudentSubject[]
+  homeworkChecks     HomeworkCheck[]
 
   @@unique([schoolId, admissionNo])
   @@index([schoolId, lastName, firstName])
@@ -1084,4 +1098,95 @@ model StudentSubject {
 
   @@unique([studentId, academicYearId, subjectId])
   @@index([academicYearId, subjectId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Homework & course materials
+// Attachments are stored as JSON: [{ key, name, mimeType, size }] (files module keys).
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Homework for one section and subject. Posting to several sections creates one row each.
+ */
+model Homework {
+  id             String   @id @default(uuid())
+  schoolId       String
+  academicYearId String
+  sectionId      String
+  subjectId      String
+  title          String
+  description    String?  @db.Text
+  /// Day it was given (shown to parents) and the day it's due
+  assignedDate   DateTime @db.Date
+  dueDate        DateTime @db.Date
+  attachments    Json
+  /// The teacher it belongs to (a coordinator may post on their behalf)
+  teacherId      String
+  postedById     String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  school       School          @relation(fields: [schoolId], references: [id])
+  academicYear AcademicYear    @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  section      Section         @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  subject      Subject         @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  teacher      User            @relation("HomeworkPostedBy", fields: [teacherId], references: [id])
+  checks       HomeworkCheck[]
+
+  @@index([schoolId, sectionId, dueDate])
+  @@index([teacherId, dueDate])
+}
+
+enum HomeworkStatus {
+  DONE
+  PARTIAL
+  NOT_DONE
+}
+
+/**
+ * Whether a student did the homework, ticked by the teacher.
+ */
+model HomeworkCheck {
+  homeworkId  String
+  studentId   String
+  status      HomeworkStatus
+  remark      String?        @db.VarChar(200)
+  checkedById String
+  updatedAt   DateTime       @updatedAt
+
+  homework Homework @relation(fields: [homeworkId], references: [id], onDelete: Cascade)
+  student  Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@id([homeworkId, studentId])
+  @@index([studentId])
+}
+
+/**
+ * Notes, slides, worksheets or a video link for a class (or one section) and subject.
+ */
+model Material {
+  id             String   @id @default(uuid())
+  schoolId       String
+  academicYearId String
+  classId        String
+  /// Null = every section of the class
+  sectionId      String?
+  subjectId      String
+  title          String
+  description    String?  @db.Text
+  /// e.g. a YouTube video
+  link           String?  @db.VarChar(500)
+  attachments    Json
+  postedById     String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  school       School       @relation(fields: [schoolId], references: [id])
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  class        SchoolClass  @relation(fields: [classId], references: [id], onDelete: Cascade)
+  section      Section?     @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  subject      Subject      @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  postedBy     User         @relation(fields: [postedById], references: [id])
+
+  @@index([schoolId, classId, subjectId])
 }

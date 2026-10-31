@@ -97,14 +97,6 @@ export function LoginPage() {
           )}
         </div>
 
-        {import.meta.env.DEV && (
-          <div className="mt-4 rounded-lg border border-dashed border-slate-300 bg-white/60 p-3 text-xs text-slate-600">
-            <p className="font-medium text-slate-700">Demo logins</p>
-            <p>School code: DEMO</p>
-            <p>School admin: admin@demo.school / Password@123</p>
-            <p>Super admin: superadmin@sms.local / SuperAdmin@123</p>
-          </div>
-        )}
       </div>
     </div>
   );
@@ -139,7 +131,7 @@ function useSchoolCode() {
 function SchoolCodeField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   return (
     <Field label="School code" hint="Leave empty if you're the platform administrator">
-      <Input value={value} onChange={(e) => onChange(e.target.value)} placeholder="e.g. DEMO" className="font-mono uppercase" maxLength={12} />
+      <Input value={value} onChange={(e) => onChange(e.target.value)} placeholder="e.g. SXS" className="font-mono uppercase" maxLength={12} />
     </Field>
   );
 }

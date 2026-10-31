@@ -3,6 +3,8 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
+const apiTarget = process.env.API_PROXY_TARGET ?? "http://localhost:4000";
+
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
@@ -17,8 +19,9 @@ export default defineConfig({
   },
   server: {
     port: 5173,
-    // The API runs on :4000; proxying keeps the web app and API on one origin in development.
-    proxy: { "/api": "http://localhost:4000", "/sites": "http://localhost:4000" },
+    // Proxying keeps the web app and API on one origin in development.
+    // The API runs on :4000; set API_PROXY_TARGET if yours runs elsewhere.
+    proxy: { "/api": apiTarget, "/sites": apiTarget },
     fs: { allow: [".", "../backend/src/modules/website/renderer", "../backend/src/modules/exams/grading.ts"] },
   },
 });

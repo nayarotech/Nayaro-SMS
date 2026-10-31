@@ -7,6 +7,20 @@ import { env } from "../../config/env.js";
 import { storage } from "../../lib/storage/index.js";
 import type { Actor } from "../audit/audit.service.js";
 
+const LEARNING_FILE_TYPES = [
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/heic",
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+] as const;
+
 /**
  * What can be uploaded, per purpose. Add a purpose here when a new screen needs uploads.
  */
@@ -19,6 +33,9 @@ export const UPLOAD_PURPOSES: Record<string, { folder: string; types: readonly s
     folder: "students/documents",
     types: ["image/png", "image/jpeg", "image/webp", "application/pdf"],
   },
+  // Homework and course materials: photos taken on a phone, PDFs and office documents
+  "homework-file": { folder: "homework", types: LEARNING_FILE_TYPES },
+  "material-file": { folder: "materials", types: LEARNING_FILE_TYPES },
   // Website files are public: anyone with the link can open them (no signed URL)
   "website-image": { folder: "website/images", types: ["image/png", "image/jpeg", "image/webp", "image/gif", "image/svg+xml"], isPublic: true },
   "website-file": {

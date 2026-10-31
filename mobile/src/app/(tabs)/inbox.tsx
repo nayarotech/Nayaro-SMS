@@ -29,15 +29,21 @@ const ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   "promotion.promote": "trending-up",
   "promotion.detain": "repeat",
   "promotion.graduate": "school",
+  "homework.posted": "book",
+  "homework.not_done": "alert-circle",
+  "material.added": "library",
 };
 
 /** Where tapping a notification goes. */
-const TARGET: Record<string, "/attendance" | "/results" | "/notes" | "/marks" | "/home"> = {
+const TARGET: Record<string, "/attendance" | "/results" | "/notes" | "/marks" | "/home" | "/homework" | "/materials"> = {
   "attendance.absent": "/attendance",
   "results.published": "/results",
   "student.note": "/notes",
   "marks.returned": "/marks",
   "attendance.proxy": "/home",
+  "homework.posted": "/homework",
+  "homework.not_done": "/homework",
+  "material.added": "/materials",
 };
 
 /** Alerts from the school: absences, published results… Opening the screen marks them read. */
@@ -72,7 +78,7 @@ export default function NotificationsScreen() {
         data.items.map((n) => (
           <Pressable key={n.id} onPress={() => open(n)} disabled={!TARGET[n.type]} style={({ pressed }) => pressed && { opacity: 0.7 }}>
             <Card style={[styles.card, !n.readAt && styles.unread]}>
-              <Ionicons name={ICONS[n.type] ?? "notifications"} size={26} color={n.type === "attendance.absent" ? colors.danger : colors.brand} />
+              <Ionicons name={ICONS[n.type] ?? "notifications"} size={26} color={n.type === "attendance.absent" || n.type === "homework.not_done" ? colors.danger : colors.brand} />
               <View style={{ flex: 1, gap: 3 }}>
                 <Text style={styles.title}>{n.title}</Text>
                 <Text style={styles.body}>{n.body}</Text>

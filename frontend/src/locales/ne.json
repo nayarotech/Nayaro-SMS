@@ -31,7 +31,10 @@
     "examSetup": "परीक्षा व्यवस्थापन",
     "results": "नतिजा तथा प्रगति पत्र",
     "promotion": "कक्षा चढुवा",
-    "optionalSubjects": "ऐच्छिक विषय"
+    "optionalSubjects": "ऐच्छिक विषय",
+    "learning": "पठनपाठन",
+    "homework": "गृहकार्य",
+    "materials": "अध्ययन सामग्री"
   },
   "common": {
     "save": "सुरक्षित गर्नुहोस्",
