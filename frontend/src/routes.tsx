@@ -1,3 +1,6 @@
+import { RecurringFeesPage } from "./features/fees/RecurringFeesPage";
+import { FeeReportsPage } from "./features/fees/FeeReportsPage";
+import { FeesPage } from "./features/fees/FeesPage";
 import { createBrowserRouter, Navigate } from "react-router";
 import { AppShell } from "./components/layout/AppShell";
 import type { ReactNode } from "react";
@@ -80,6 +83,9 @@ export const router = createBrowserRouter([
           { path: "exams/marks", element: guard(MARKS_ANY, <MarksHomePage />) },
           { path: "exams/:examId/marks/:sectionId/:subjectId", element: guard(MARKS_ANY, <MarkSheetPage />) },
           { path: "exams/results", element: guard(RESULTS_ANY, <ResultsPage />) },
+          { path: "fees/recurring", element: guard("fees.manage", <RecurringFeesPage />) },
+          { path: "fees/reports", element: guard("fees.report", <FeeReportsPage />) },
+          { path: "fees", element: guard(["fees.view", "fees.manage", "fees.collect", "fees.report", "fees.reverse"], <FeesPage />) },
           { path: "promotions", element: guard("promotion.manage", <PromotionPage />) },
           { path: "homework", element: guard(["homework.post", "homework.post_on_behalf", "student.record.view"], <HomeworkPage />) },
           { path: "materials", element: guard(["material.upload", "homework.post", "homework.post_on_behalf", "student.record.view"], <MaterialsPage />) },

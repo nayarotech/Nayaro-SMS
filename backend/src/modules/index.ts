@@ -1,3 +1,4 @@
+import { feesModule, parentFeesModule } from "./fees/fees.routes.js";
 import type { RouteModule } from "../http/route.js";
 import {
   academicYearsModule,
@@ -27,6 +28,8 @@ import { guardiansModule, myModule, studentsModule } from "./students/student.ro
 /** Every API module. Add new modules here to mount them and include them in the API docs. */
 export const modules: RouteModule[] = [
   authModule,
+  feesModule,
+  parentFeesModule,
   schoolsModule,
   schoolProfileModule,
   settingsModule,

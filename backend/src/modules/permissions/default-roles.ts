@@ -82,7 +82,7 @@ export const DEFAULT_ROLES: DefaultRole[] = [
     key: SYSTEM_ROLE_KEYS.accountant,
     name: "Accountant",
     description: "Fees, payments and receipts",
-    permissions: ["student.view", "guardian.view", "academic.view", "fees.view", "fees.manage", "fees.collect", "fees.report"],
+    permissions: ["student.view", "guardian.view", "academic.view", "fees.view", "fees.manage", "fees.collect", "fees.reverse", "fees.report"],
   },
   {
     key: SYSTEM_ROLE_KEYS.classTeacher,

@@ -39,6 +39,8 @@ const envSchema = z.object({
   /** Shown to schools that reach their student limit, e.g. "Nayaro Tech · 98XXXXXXXX · sales@example.com" */
   SALES_CONTACT: z.string().default(""),
 
+  FEE_SCHEDULER_ENABLED: z.enum(["true", "false"]).default("true").transform((value) => value === "true"),
+
   SMS_PROVIDER: z.enum(["console", "sparrow"]).default("console"),
   SPARROW_SMS_TOKEN: z.string().optional(),
   SPARROW_SMS_FROM: z.string().optional(),

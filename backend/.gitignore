@@ -1,7 +1,9 @@
 node_modules
 dist
 .env
-storage
+/storage/
 src/generated
 coverage
 storage-test
+
+/.cache/

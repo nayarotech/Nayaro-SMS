@@ -66,7 +66,7 @@ export const filesModule = defineModule("/files", "Files", [
       if (!meta) throw notFound("File");
 
       res.setHeader("Content-Type", meta.mimeType);
-      res.setHeader("Cache-Control", "private, max-age=3600");
+      res.setHeader("Cache-Control", /^schools\/[^/]+\/receipts\//.test(query.key) ? "private, no-store" : "private, max-age=3600");
       res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(meta.originalName)}"`);
       await sendFile(res, query.key);
     },

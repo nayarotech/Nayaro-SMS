@@ -16,7 +16,7 @@ interface Notification {
   title: string;
   body: string;
   readAt: string | null;
-  data: { studentId?: string } | null;
+  data: { studentId?: string; billId?: string } | null;
   createdAt: string;
 }
 
@@ -32,10 +32,11 @@ const ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   "homework.posted": "book",
   "homework.not_done": "alert-circle",
   "material.added": "library",
+  "fees.reminder": "wallet",
 };
 
 /** Where tapping a notification goes. */
-const TARGET: Record<string, "/attendance" | "/results" | "/notes" | "/marks" | "/home" | "/homework" | "/materials"> = {
+const TARGET: Record<string, "/attendance" | "/results" | "/notes" | "/marks" | "/home" | "/homework" | "/materials" | "/fees"> = {
   "attendance.absent": "/attendance",
   "results.published": "/results",
   "student.note": "/notes",
@@ -44,6 +45,7 @@ const TARGET: Record<string, "/attendance" | "/results" | "/notes" | "/marks" | 
   "homework.posted": "/homework",
   "homework.not_done": "/homework",
   "material.added": "/materials",
+  "fees.reminder": "/fees",
 };
 
 /** Alerts from the school: absences, published results… Opening the screen marks them read. */
@@ -67,7 +69,9 @@ export default function NotificationsScreen() {
     const target = TARGET[n.type];
     if (!target) return;
     if (n.data?.studentId) selectChild(n.data.studentId);
-    router.push(target);
+    if (n.type === "fees.reminder" && n.data?.studentId && n.data?.billId) {
+      router.push({ pathname: "/fees/[id]", params: { id: n.data.billId, childId: n.data.studentId } });
+    } else router.push(target);
   };
 
   return (

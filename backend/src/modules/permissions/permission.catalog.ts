@@ -143,10 +143,10 @@ export const PERMISSION_GROUPS = [
   {
     key: "fees",
     label: "Fees & payments",
-    comingSoon: true,
     permissions: [
       { key: "fees.view", label: "View fees and dues" },
       { key: "fees.manage", label: "Manage fee structure, discounts and fines" },
+      { key: "fees.reverse", label: "Reverse recorded fee payments" },
       { key: "fees.collect", label: "Collect payments and mark bills paid" },
       { key: "fees.report", label: "View collection reports" },
     ],

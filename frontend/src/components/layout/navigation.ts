@@ -1,4 +1,5 @@
 import {
+  Wallet,
   BookOpen,
   BookOpenCheck,
   Library,
@@ -58,6 +59,9 @@ export const NAVIGATION: NavSection[] = [
   {
     labelKey: "nav.dailyWork",
     items: [
+      { labelKey: "nav.recurringFees", path: "/fees/recurring", icon: CalendarRange, permission: "fees.manage", module: "fees" },
+      { labelKey: "nav.feeReports", path: "/fees/reports", icon: BarChart3, permission: "fees.report", module: "fees" },
+      { labelKey: "nav.fees", path: "/fees", icon: Wallet, permission: ["fees.view", "fees.manage", "fees.collect", "fees.report", "fees.reverse"], module: "fees" },
       { labelKey: "nav.takeAttendance", path: "/attendance", icon: ClipboardCheck, permission: ["attendance.mark", "attendance.proxy.assign"], module: "attendance" },
       { labelKey: "nav.attendanceReports", path: "/attendance/reports", icon: BarChart3, permission: ["attendance.view", "attendance.report", "attendance.proxy.assign"], module: "attendance" },
       { labelKey: "nav.proxies", path: "/attendance/proxies", icon: UserCheck, permission: "attendance.proxy.assign", module: "attendance" },

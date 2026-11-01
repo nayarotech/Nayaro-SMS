@@ -84,6 +84,7 @@ export function ParentHome() {
 
 function ChildSummary({ child }: { child: Child }) {
   const { t, language } = useI18n();
+  const { me } = useSession();
   const base = `/my/children/${child.id}`;
   const { data: profile, offline } = useCachedFetch<ChildProfile>(base);
   const { data: attendance } = useCachedFetch<AttendanceSummary>(`${base}/attendance`);
@@ -145,6 +146,9 @@ function ChildSummary({ child }: { child: Child }) {
         <Tile icon="library-outline" title={t("materials")} onPress={() => router.push("/materials")}>
           <Text style={styles.tileNote}>{t("open")}</Text>
         </Tile>
+        {me?.settings?.["modules.fees"] !== false && <Tile icon="wallet-outline" title={t("fees")} onPress={() => router.push("/fees")}>
+          <Text style={styles.tileNote}>{t("feeOpen")}</Text>
+        </Tile>}
         <Tile icon="ribbon-outline" title={t("notes")} onPress={() => router.push("/notes")} wide>
           {notes?.length ? (
             <>

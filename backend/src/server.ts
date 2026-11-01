@@ -5,13 +5,18 @@ import { prisma } from "./lib/prisma.js";
 import { closePdfBrowser } from "./lib/pdf.js";
 import { redis } from "./lib/redis.js";
 
+import { startFeeScheduler } from "./modules/fees/scheduler.service.js";
+
+let stopFeeScheduler: (() => Promise<void>) | undefined;
 const server = createApp().listen(env.PORT, () => {
+  stopFeeScheduler = startFeeScheduler();
   logger.info(`API running on http://localhost:${env.PORT}  (docs: http://localhost:${env.PORT}/api/docs)`);
 });
 
 async function shutdown(signal: string) {
   logger.info(`${signal} received, shutting down`);
   server.close();
+  await stopFeeScheduler?.();
   await Promise.allSettled([prisma.$disconnect(), redis.quit(), closePdfBrowser()]);
   process.exit(0);
 }
